@@ -12,7 +12,7 @@ An interactive 3D animation featuring two spheres made of particles that rotate,
 
 ## Demo
 
-Visit [https://YOUR_USERNAME.github.io/dual-sphere/](https://YOUR_USERNAME.github.io/dual-sphere/) to see the live demo.
+Visit [https://phil-on-air.github.io/dual-sphere/](https://phil-on-air.github.io/dual-sphere/) to see the live demo.
 
 ## Technologies Used
 
@@ -25,7 +25,7 @@ Visit [https://YOUR_USERNAME.github.io/dual-sphere/](https://YOUR_USERNAME.githu
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/dual-sphere.git
+   git clone https://github.com/phil-on-air/dual-sphere.git
    ```
 
 2. Navigate to the project directory:
@@ -49,4 +49,4 @@ MIT License - feel free to use this code for your own projects.
 
 ## Credits
 
-Created by [Your Name] 
+Created by Phil 
