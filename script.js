@@ -233,29 +233,70 @@ for (let i = 0; i < rings; i++) {
 
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 const sphere = new THREE.Points(geometry, material);
+sphere.position.set(0, 0, 0);
 scene.add(sphere);
+
+// Create second sphere
+const geometry2 = new THREE.BufferGeometry();
+const positions2 = new Float32Array(particles * 3);
+
+// Use the same sphere generation logic as the first sphere for identical structure
+for (let i = 0; i < rings; i++) {
+    const lat = Math.PI * (-0.5 + i / rings);
+    for (let j = 0; j < segments; j++) {
+        const lon = 2 * Math.PI * j / segments;
+        const index = i * segments + j;
+        
+        const x = radius * Math.cos(lat) * Math.cos(lon);
+        const y = radius * Math.sin(lat);
+        const z = radius * Math.cos(lat) * Math.sin(lon);
+        
+        positions2[index * 3] = x;
+        positions2[index * 3 + 1] = y;
+        positions2[index * 3 + 2] = z;
+    }
+}
+
+geometry2.setAttribute('position', new THREE.BufferAttribute(positions2, 3));
+
+// Use the same material for both spheres
+const sphere2 = new THREE.Points(geometry2, material);
+sphere2.position.set(3, 0, 0);
+scene.add(sphere2);
 
 // Position camera
 camera.position.z = 15;
 
+// Movement parameters for spheres
+let time = 0;
+const moveRadius = 4;
+const moveSpeed = 0.001;
+
 // Glitch effect variables
 let isGlitching = false;
 let glitchTimeout;
-let originalPosition = { x: sphere.position.x, y: sphere.position.y, z: sphere.position.z };
+let originalPositions = {
+    sphere1: new THREE.Vector3(),
+    sphere2: new THREE.Vector3()
+};
 
 function startGlitch() {
     if (!isGlitching) {
         isGlitching = true;
-        // Random duration between 100ms and 300ms
-        const duration = 100 + Math.random() * 200;
+        // Store original positions
+        originalPositions.sphere1.copy(sphere.position);
+        originalPositions.sphere2.copy(sphere2.position);
         
         // Play glitch sound if audio is initialized
         createGlitchSound();
         
+        // Random duration between 100ms and 300ms
+        const duration = 100 + Math.random() * 200;
         setTimeout(() => {
             isGlitching = false;
-            // Reset position
-            sphere.position.set(originalPosition.x, originalPosition.y, originalPosition.z);
+            // Reset positions
+            sphere.position.copy(originalPositions.sphere1);
+            sphere2.position.copy(originalPositions.sphere2);
         }, duration);
     }
 }
@@ -269,20 +310,108 @@ function scheduleNextGlitch() {
     }, nextGlitch);
 }
 
-// Animation
+// Function to calculate point opacity based on distance to other sphere
+function calculatePointOpacity(point, otherSpherePosition, radius) {
+    const distance = point.distanceTo(otherSpherePosition);
+    if (distance > radius * 2) return 1.0;
+    
+    // Smooth transition in intersection area
+    const transitionStart = radius * 1.5;
+    const transitionEnd = radius * 0.5;
+    
+    if (distance > transitionStart) {
+        return 1.0;
+    } else if (distance < transitionEnd) {
+        return 0.5;
+    } else {
+        // Smooth interpolation between 1.0 and 0.5
+        const t = (distance - transitionEnd) / (transitionStart - transitionEnd);
+        return 0.5 + (t * 0.5);
+    }
+}
+
+// Update animation function
 function animate() {
     requestAnimationFrame(animate);
     
-    // Regular rotation
+    // Counter-rotating spheres
     sphere.rotation.x += 0.001;
     sphere.rotation.y += 0.002;
+    sphere.rotation.z += 0.001;
     
-    // Apply glitch effect
-    if (isGlitching) {
-        sphere.position.x = originalPosition.x + (Math.random() - 0.5) * 0.2;
-        sphere.position.y = originalPosition.y + (Math.random() - 0.5) * 0.2;
-        sphere.position.z = originalPosition.z + (Math.random() - 0.5) * 0.2;
+    sphere2.rotation.x -= 0.002;
+    sphere2.rotation.y -= 0.001;
+    sphere2.rotation.z -= 0.001;
+    
+    // Independent circular movements in different planes
+    time += moveSpeed;
+    
+    if (!isGlitching) {
+        sphere2.position.x = Math.cos(time) * moveRadius;
+        sphere2.position.z = Math.sin(time) * moveRadius;
+        
+        sphere.position.x = Math.sin(time * 0.8) * (moveRadius * 0.7);
+        sphere.position.y = Math.cos(time * 0.8) * (moveRadius * 0.7);
+    } else {
+        // Apply glitch effect
+        const glitchAmount = 0.2;
+        sphere.position.copy(originalPositions.sphere1)
+            .add(new THREE.Vector3(
+                (Math.random() - 0.5) * glitchAmount,
+                (Math.random() - 0.5) * glitchAmount,
+                (Math.random() - 0.5) * glitchAmount
+            ));
+        
+        sphere2.position.copy(originalPositions.sphere2)
+            .add(new THREE.Vector3(
+                (Math.random() - 0.5) * glitchAmount,
+                (Math.random() - 0.5) * glitchAmount,
+                (Math.random() - 0.5) * glitchAmount
+            ));
     }
+    
+    // Update point opacities for smooth intersection
+    const positions1 = sphere.geometry.attributes.position;
+    const positions2 = sphere2.geometry.attributes.position;
+    
+    // Create opacity attributes if they don't exist
+    if (!sphere.geometry.attributes.opacity) {
+        const opacities1 = new Float32Array(particles);
+        const opacities2 = new Float32Array(particles);
+        sphere.geometry.setAttribute('opacity', new THREE.BufferAttribute(opacities1, 1));
+        sphere2.geometry.setAttribute('opacity', new THREE.BufferAttribute(opacities2, 1));
+        
+        // Update material to use opacity
+        material.transparent = true;
+        material.vertexColors = false;
+        material.color.set(0xffffff);
+    }
+    
+    const opacities1 = sphere.geometry.attributes.opacity;
+    const opacities2 = sphere2.geometry.attributes.opacity;
+    
+    // Calculate world positions and update opacities
+    const worldPos = new THREE.Vector3();
+    for (let i = 0; i < particles; i++) {
+        // Update first sphere points
+        worldPos.set(
+            positions1.array[i * 3],
+            positions1.array[i * 3 + 1],
+            positions1.array[i * 3 + 2]
+        ).applyMatrix4(sphere.matrixWorld);
+        opacities1.array[i] = calculatePointOpacity(worldPos, sphere2.position, radius);
+        
+        // Update second sphere points
+        worldPos.set(
+            positions2.array[i * 3],
+            positions2.array[i * 3 + 1],
+            positions2.array[i * 3 + 2]
+        ).applyMatrix4(sphere2.matrixWorld);
+        opacities2.array[i] = calculatePointOpacity(worldPos, sphere.position, radius);
+    }
+    
+    opacities1.needsUpdate = true;
+    opacities2.needsUpdate = true;
     
     renderer.render(scene, camera);
 }
@@ -346,6 +475,6 @@ document.addEventListener('click', () => {
     }
 }, { once: true });
 
-// Start animation immediately
+// Start animation and glitch effect
 animate();
 scheduleNextGlitch(); 
