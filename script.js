@@ -211,7 +211,10 @@ const positions = new Float32Array(particles * 3);
 const material = new THREE.PointsMaterial({
     color: 0xffffff,
     size: 0.05,
-    sizeAttenuation: true
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 1.0,
+    blending: THREE.AdditiveBlending
 });
 
 // Calculate positions for each dot on the sphere
@@ -369,49 +372,6 @@ function animate() {
                 (Math.random() - 0.5) * glitchAmount
             ));
     }
-    
-    // Update point opacities for smooth intersection
-    const positions1 = sphere.geometry.attributes.position;
-    const positions2 = sphere2.geometry.attributes.position;
-    
-    // Create opacity attributes if they don't exist
-    if (!sphere.geometry.attributes.opacity) {
-        const opacities1 = new Float32Array(particles);
-        const opacities2 = new Float32Array(particles);
-        sphere.geometry.setAttribute('opacity', new THREE.BufferAttribute(opacities1, 1));
-        sphere2.geometry.setAttribute('opacity', new THREE.BufferAttribute(opacities2, 1));
-        
-        // Update material to use opacity
-        material.transparent = true;
-        material.vertexColors = false;
-        material.color.set(0xffffff);
-    }
-    
-    const opacities1 = sphere.geometry.attributes.opacity;
-    const opacities2 = sphere2.geometry.attributes.opacity;
-    
-    // Calculate world positions and update opacities
-    const worldPos = new THREE.Vector3();
-    for (let i = 0; i < particles; i++) {
-        // Update first sphere points
-        worldPos.set(
-            positions1.array[i * 3],
-            positions1.array[i * 3 + 1],
-            positions1.array[i * 3 + 2]
-        ).applyMatrix4(sphere.matrixWorld);
-        opacities1.array[i] = calculatePointOpacity(worldPos, sphere2.position, radius);
-        
-        // Update second sphere points
-        worldPos.set(
-            positions2.array[i * 3],
-            positions2.array[i * 3 + 1],
-            positions2.array[i * 3 + 2]
-        ).applyMatrix4(sphere2.matrixWorld);
-        opacities2.array[i] = calculatePointOpacity(worldPos, sphere.position, radius);
-    }
-    
-    opacities1.needsUpdate = true;
-    opacities2.needsUpdate = true;
     
     renderer.render(scene, camera);
 }
